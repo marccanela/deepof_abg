@@ -1358,11 +1358,11 @@ def plot_embeddings(
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                aggregated_embeddings, explained_variance, rotated_loading_scores, original_embedding = post_hoc_customized.get_aggregated_embedding(
                     emb_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                aggregated_embeddings, explained_variance, rotated_loading_scores, original_embedding = post_hoc_customized.get_aggregated_embedding(
                     sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
 
@@ -1643,11 +1643,11 @@ def plot_embeddings_timelapse(
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                aggregated_embeddings, explained_variance, rotated_loading_scores, original_embedding = post_hoc_customized.get_aggregated_embedding(
                     emb_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                aggregated_embeddings, explained_variance, rotated_loading_scores, original_embedding = post_hoc_customized.get_aggregated_embedding(
                     sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
 
@@ -3217,8 +3217,10 @@ def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
         
     # Display the variable names and their corresponding loading scores
     features = next(iter(dataframe_for_titles.values())).columns.tolist()
-    # pc_loading_scores = rotated_loading_scores[0, :] # PC1
-    pc_loading_scores = rotated_loading_scores[1, :] # PC2
+    if pca == 'PCA-1':
+        pc_loading_scores = rotated_loading_scores[0, :] # PC1
+    elif pca == 'PCA-2':
+        pc_loading_scores = rotated_loading_scores[1, :] # PC2
     loading_scores_df = pd.DataFrame({'Variable': features, 'PC_Loading': pc_loading_scores})
     loading_scores_df = loading_scores_df.reindex(loading_scores_df['PC_Loading'].abs().sort_values(ascending=False).index)
     loading_scores_df.drop(loading_scores_df[loading_scores_df['PC_Loading'] == 0].index, inplace=True)

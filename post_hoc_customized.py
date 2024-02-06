@@ -306,7 +306,7 @@ def get_aggregated_embedding(
         
         embedding = pd.DataFrame(transformed_data, index=embedding.index)
 
-    return embedding, explained_variance, rotated_loading_scores
+    return embedding, explained_variance, rotated_loading_scores, original_embedding
 
 
 def select_time_bin(
