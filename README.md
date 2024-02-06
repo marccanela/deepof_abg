@@ -5,7 +5,7 @@ Welcome to the Busquets-Garcia Lab DeepOF Scripts Repository. This repository co
 To get started with these personalized DeepOF scripts, you may start by cloning the repository to your local machine using the following command:
 
 ```bash
-git clone https://github.com/marccanela/abg-deepof-scripts-repository.git
+git clone https://github.com/marccanela/deepof_abg.git
 ```
 
 Make sure you have the required dependencies installed. You can typically install these via pip:
