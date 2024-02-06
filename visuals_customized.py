@@ -1426,9 +1426,9 @@ def plot_embeddings(
         )
     
         for level in embedding_dataset["experimental condition"].unique():
-            x_coord = my_coords_dict[level][0]
-            y_coord = my_coords_dict[level][1]
-            ax.text(x_coord, y_coord, level, fontsize=12, ha='left', va='top',
+            x_coord = my_coords_dict[level][1][0]
+            y_coord = my_coords_dict[level][1][1]
+            ax.text(x_coord, y_coord,  my_coords_dict[level][0], fontsize=12, ha='left', va='top',
                         weight='bold', color=my_color_dict[level] if my_color_dict is not None else grey_stark)
         
     if save:
@@ -1711,9 +1711,9 @@ def plot_embeddings_timelapse(
         )
     
         for level in embedding_dataset["experimental condition"].unique():
-            x_coord = my_coords_dict[level][0]
-            y_coord = my_coords_dict[level][1]
-            ax.text(x_coord, y_coord, level, fontsize=12, ha='left', va='top',
+            x_coord = my_coords_dict[level][1][0]
+            y_coord = my_coords_dict[level][1][1]
+            ax.text(x_coord, y_coord,  my_coords_dict[level][0], fontsize=12, ha='left', va='top',
                         weight='bold', color=my_color_dict[level] if my_color_dict is not None else grey_stark)
         
     if save:
