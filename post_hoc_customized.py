@@ -213,8 +213,10 @@ def recluster(
 def get_time_on_cluster(
     soft_counts: table_dict,
     breaks: table_dict,
+    given_pca: PCA = None,
     normalize: bool = True,
     reduce_dim: bool = False,
+
 ):
     """Compute how much each animal spends on each cluster.
 
@@ -251,22 +253,24 @@ def get_time_on_cluster(
     counter_df = counter_df[sorted(counter_df.columns)]
 
     if reduce_dim:
-        agg_pipeline = Pipeline([
-            ("scaler", StandardScaler()),
-            ("PCA", PCA(n_components=2))
-            ])
-        transformed_data = agg_pipeline.fit_transform(counter_df)
         
-        explained_variance = agg_pipeline.named_steps['PCA'].explained_variance_ratio_
-        rotated_loading_scores = agg_pipeline.named_steps["PCA"].components_
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(counter_df)
         
+        if given_pca is not None:
+            pca = given_pca
+        else:
+            pca = PCA(n_components=2)
+            pca.fit(scaled_data)
+        
+        transformed_data = pca.transform(scaled_data)
         counter_df = pd.DataFrame(transformed_data, index=counter_df.index)
 
-    return counter_df, explained_variance, rotated_loading_scores
+    return counter_df, pca
 
 
 def get_aggregated_embedding(
-    embedding: np.ndarray, reduce_dim: bool = False, agg: str = "mean"
+    embedding: np.ndarray, given_pca: PCA = None, reduce_dim: bool = False, agg: str = "mean"
 ):
     """Aggregate the embeddings of a set of videos, using the specified aggregation method.
 
@@ -291,22 +295,21 @@ def get_aggregated_embedding(
             {key: np.nanmedian(value, axis=0) for key, value in embedding.items()}
         ).T
     
-    
-
     if reduce_dim:
-        original_embedding = copy.deepcopy(embedding)
-        agg_pipeline = Pipeline([
-            ("scaler", StandardScaler()),
-            ("PCA", PCA(n_components=2))
-            ])
-        transformed_data = agg_pipeline.fit_transform(embedding)
         
-        explained_variance = agg_pipeline.named_steps['PCA'].explained_variance_ratio_
-        rotated_loading_scores = agg_pipeline.named_steps["PCA"].components_
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(embedding)
         
+        if given_pca is not None:
+            pca = given_pca
+        else:
+            pca = PCA(n_components=2)
+            pca.fit(scaled_data)
+        
+        transformed_data = pca.transform(scaled_data)
         embedding = pd.DataFrame(transformed_data, index=embedding.index)
 
-    return embedding, explained_variance, rotated_loading_scores, original_embedding
+    return embedding, pca
 
 
 def select_time_bin(
