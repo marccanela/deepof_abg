@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython import display
 from networkx import Graph, draw
+from sklearn.metrics import silhouette_score
 
 # Define directories
-directory_output = '/home/sie/Desktop/marc/dual videos'
+directory_output = '/home/sie/Desktop/marc/brain_01a02/'
 directory_dlc = '/home/sie/Desktop/marc/dual videos/h5'
 directory_videos = '/home/sie/Desktop/marc/dual videos/mp4'
 
@@ -49,12 +50,12 @@ my_deepof_project.edit_arenas(
 )
 
 # Load conditions
-my_deepof_project.load_exp_conditions(directory_output + '/conditions.csv')
+my_deepof_project.load_exp_conditions(directory_output + 'conditions.csv')
 
 # Check conditions
 coords = my_deepof_project.get_coords()
 print("The original dataset has {} videos".format(len(coords)))
-coords = coords.filter_condition({"protocol": "hc_ind"})
+coords = coords.filter_condition({"protocol": "paired"})
 print("The filtered dataset has only {} videos".format(len(coords)))
 
 # Perform a supervised analysis
@@ -64,7 +65,7 @@ with open('/home/sie/Desktop/marc/dual videos/supervised_annotation.pkl', 'wb') 
     
 # Perform an unsupervised analysis
 graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler = my_deepof_project.get_graph_dataset(
-    animal_id="nocolor", # Comment out for multi-animal embeddings
+    # animal_id="nocolor", # Comment out for multi-animal embeddings
     center="Center",
     align="Spine_1",
     window_size=25,
@@ -80,10 +81,10 @@ trained_model = my_deepof_project.deep_unsupervised_embedding(
     embedding_model="VaDE", # Can also be set to 'VQVAE' and 'Contrastive'
     epochs=10,
     encoder_type="recurrent", # Can also be set to 'TCN' and 'transformer'
-    n_components=10,
-    latent_dim=4,
+    n_components=7,
+    latent_dim=4, # Dimention size of the latent space (aka, number of embeddings)
     batch_size=1024,
-    verbose=False, # Set to True to follow the training loop
+    verbose=True, # Set to True to follow the training loop
     interaction_regularization=0.0,
     pretrained=False, # Set to False to train a new model!
 )
@@ -93,16 +94,87 @@ embeddings, soft_counts, breaks = deepof.model_utils.embedding_per_video(
     coordinates=my_deepof_project,
     to_preprocess=to_preprocess,
     model=trained_model,
-    animal_id='nocolor', # Comment out for multi-animal embeddings
+    # animal_id='nocolor', # Comment out for multi-animal embeddings
     global_scaler=global_scaler,
 )
 
+# with open(directory_output + 'embeddings.pkl', 'wb') as file:
+#     pickle.dump(embeddings, file)
+# with open(directory_output + 'soft_counts.pkl', 'wb') as file:
+#     pickle.dump(soft_counts, file)
+# with open(directory_output + 'breaks.pkl', 'wb') as file:
+#     pickle.dump(breaks, file)
+
+# Identify correct number of clusters
+combined_embeddings = np.concatenate(list(embeddings.values()), axis=0)
+
+hard_counts = {}
+for individual, clusters_probabilities in soft_counts.items():
+    # Find the index of the cluster with the maximum probability for each column
+    hard_count_indices = [max(range(len(cluster)), key=lambda i: cluster[i]) for cluster in clusters_probabilities]
+    # Create a list of hard counts for the individual
+    hard_counts[individual] = hard_count_indices
+# Combine all individual hard counts into a single list
+combined_hard_counts = [hard_count for individual_hard_counts in hard_counts.values() for hard_count in individual_hard_counts]
+
+from sklearn.metrics import silhouette_score
+silhouette_score(combined_embeddings, combined_hard_counts, 
+                   sample_size=10000, random_state=42
+                 )
+
+
+def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler):
+    silhouette_score_dict = {}
+    num_clusters = [2,3,4,5,6,7,8,9,10]
+    for num in num_clusters:
+        trained_model = my_deepof_project.deep_unsupervised_embedding(
+            preprocessed_object=graph_preprocessed_coords, # Change to preprocessed_coords to use non-graph embeddings
+            adjacency_matrix=adj_matrix,
+            embedding_model="VaDE", # Can also be set to 'VQVAE' and 'Contrastive'
+            epochs=10,
+            encoder_type="recurrent", # Can also be set to 'TCN' and 'transformer'
+            n_components=num,
+            latent_dim=4, # Dimention size of the latent space (aka, number of embeddings)
+            batch_size=1024,
+            verbose=True, # Set to True to follow the training loop
+            interaction_regularization=0.0,
+            pretrained=False, # Set to False to train a new model!
+        )
+        embeddings, soft_counts, breaks = deepof.model_utils.embedding_per_video(
+            coordinates=my_deepof_project,
+            to_preprocess=to_preprocess,
+            model=trained_model,
+            # animal_id='nocolor', # Comment out for multi-animal embeddings
+            global_scaler=global_scaler,
+        )
+        hard_counts = {}
+        for individual, clusters_probabilities in soft_counts.items():
+            # Find the index of the cluster with the maximum probability for each column
+            hard_count_indices = [max(range(len(cluster)), key=lambda i: cluster[i]) for cluster in clusters_probabilities]
+            # Create a list of hard counts for the individual
+            hard_counts[individual] = hard_count_indices
+        # Combine all individual hard counts into a single list
+        combined_hard_counts = [hard_count for individual_hard_counts in hard_counts.values() for hard_count in individual_hard_counts]
+        combined_embeddings = np.concatenate(list(embeddings.values()), axis=0)
+        score = silhouette_score(combined_embeddings, combined_hard_counts, sample_size=10000, random_state=42)
+        
+        silhouette_score_dict[num] = score
+    return silhouette_score_dict
+    
+silhouette_score_dict = silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler)
+
 # =============================================================================
 # Load a previously saved project and supervised analysis
-my_deepof_project = deepof.data.load_project(directory_output + "/deepof_tutorial_project")
-my_deepof_project.load_exp_conditions(directory_output + '/conditions.csv')
-with open('/home/sie/Desktop/marc/dual videos/supervised_annotation.pkl', 'rb') as file:
+my_deepof_project = deepof.data.load_project(directory_output + "deepof_tutorial_project")
+my_deepof_project.load_exp_conditions(directory_output + 'conditions.csv')
+with open(directory_output + 'supervised_annotation.pkl', 'rb') as file:
     supervised_annotation = pickle.load(file)
+with open(directory_output + 'embeddings.pkl', 'rb') as file:
+    embeddings = pickle.load(file)
+with open(directory_output + 'soft_counts.pkl', 'rb') as file:
+    soft_counts = pickle.load(file)
+with open(directory_output + 'breaks.pkl', 'rb') as file:
+    breaks = pickle.load(file)
 
 # =============================================================================
 # Heatmaps
