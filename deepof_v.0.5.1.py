@@ -63,7 +63,7 @@ coords = coords.filter_condition({"protocol": "paired"})
 print("The filtered dataset has only {} videos".format(len(coords)))
 
 # Load a previously saved project
-my_deepof_project = deepof.data.load_project(directory_output + "/tutorial_project")
+my_deepof_project = deepof.data.load_project(directory_output + "deepof_tutorial_project")
 
 # Perform a supervised analysis
 supervised_annotation = my_deepof_project.supervised_annotation()

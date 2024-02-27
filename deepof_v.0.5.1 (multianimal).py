@@ -9,14 +9,13 @@ import os
 import pandas as pd
 import pickle
 import deepof.data
-import copy
 import numpy as np
 import deepof.visuals
 import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython import display
-from networkx import Graph, draw
-from sklearn.metrics import silhouette_score
+import matplotlib.cm as cm
+from sklearn.metrics import silhouette_samples, silhouette_score
 
 # Define directories
 directory_output = '/home/sie/Desktop/marc/brain_01a02/'
@@ -68,64 +67,19 @@ graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler = my_deepof_
     # animal_id="nocolor", # Comment out for multi-animal embeddings
     center="Center",
     align="Spine_1",
-    window_size=25,
+    window_size=25, # Adjust to frame rate
     window_step=1,
     test_videos=1,
     preprocess=True,
     scale="standard",
 )
 
-trained_model = my_deepof_project.deep_unsupervised_embedding(
-    preprocessed_object=graph_preprocessed_coords, # Change to preprocessed_coords to use non-graph embeddings
-    adjacency_matrix=adj_matrix,
-    embedding_model="VaDE", # Can also be set to 'VQVAE' and 'Contrastive'
-    epochs=10,
-    encoder_type="recurrent", # Can also be set to 'TCN' and 'transformer'
-    n_components=7,
-    latent_dim=4, # Dimention size of the latent space (aka, number of embeddings)
-    batch_size=1024,
-    verbose=True, # Set to True to follow the training loop
-    interaction_regularization=0.0,
-    pretrained=False, # Set to False to train a new model!
-)
-
-# Get embeddings, soft_counts, and breaks per video
-embeddings, soft_counts, breaks = deepof.model_utils.embedding_per_video(
-    coordinates=my_deepof_project,
-    to_preprocess=to_preprocess,
-    model=trained_model,
-    # animal_id='nocolor', # Comment out for multi-animal embeddings
-    global_scaler=global_scaler,
-)
-
-# with open(directory_output + 'embeddings.pkl', 'wb') as file:
-#     pickle.dump(embeddings, file)
-# with open(directory_output + 'soft_counts.pkl', 'wb') as file:
-#     pickle.dump(soft_counts, file)
-# with open(directory_output + 'breaks.pkl', 'wb') as file:
-#     pickle.dump(breaks, file)
-
-# Identify correct number of clusters
-combined_embeddings = np.concatenate(list(embeddings.values()), axis=0)
-
-hard_counts = {}
-for individual, clusters_probabilities in soft_counts.items():
-    # Find the index of the cluster with the maximum probability for each column
-    hard_count_indices = [max(range(len(cluster)), key=lambda i: cluster[i]) for cluster in clusters_probabilities]
-    # Create a list of hard counts for the individual
-    hard_counts[individual] = hard_count_indices
-# Combine all individual hard counts into a single list
-combined_hard_counts = [hard_count for individual_hard_counts in hard_counts.values() for hard_count in individual_hard_counts]
-
-from sklearn.metrics import silhouette_score
-silhouette_score(combined_embeddings, combined_hard_counts, 
-                   sample_size=10000, random_state=42
-                 )
-
-
 def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler):
+    # start_time = time.time()
     silhouette_score_dict = {}
-    num_clusters = [2,3,4,5,6,7,8,9,10]
+    num_clusters = list(range(2, 26))
+    # num_clusters = [8]
+    
     for num in num_clusters:
         trained_model = my_deepof_project.deep_unsupervised_embedding(
             preprocessed_object=graph_preprocessed_coords, # Change to preprocessed_coords to use non-graph embeddings
@@ -147,6 +101,7 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
             # animal_id='nocolor', # Comment out for multi-animal embeddings
             global_scaler=global_scaler,
         )
+        
         hard_counts = {}
         for individual, clusters_probabilities in soft_counts.items():
             # Find the index of the cluster with the maximum probability for each column
@@ -156,25 +111,125 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
         # Combine all individual hard counts into a single list
         combined_hard_counts = [hard_count for individual_hard_counts in hard_counts.values() for hard_count in individual_hard_counts]
         combined_embeddings = np.concatenate(list(embeddings.values()), axis=0)
-        score = silhouette_score(combined_embeddings, combined_hard_counts, sample_size=10000, random_state=42)
+        score = silhouette_score(combined_embeddings, combined_hard_counts,
+                                 sample_size=10000, random_state=42)
         
-        silhouette_score_dict[num] = score
+        silhouette_score_dict[num] = [score, combined_hard_counts, combined_embeddings, embeddings, soft_counts, breaks]
+        
     return silhouette_score_dict
     
 silhouette_score_dict = silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler)
 
+with open(directory_output + 'silhouettes_epochs10_dim4_batch1024.pkl', 'wb') as file:
+    pickle.dump(silhouette_score_dict, file)
+
+def plot_silhouette_scores(silhouette_score_dict):
+    silhouette_scores = [value[0] for value in silhouette_score_dict.values()]
+
+    plt.figure(figsize=(8, 3))
+    plt.plot(range(2, 26), silhouette_scores, "bo-")
+    plt.xlabel("$k$")
+    plt.ylabel("Silhouette score")
+    plt.axis([1.8, 25.5, -1, 1])
+    plt.grid()
+    plt.hlines(0, 1.8, 25.5)
+    plt.show()
+
+
+def silhouette_diagrams(silhouette_score_dict):
+    
+    range_n_clusters = [2,3,15]
+    for n_clusters in range_n_clusters:
+        X = silhouette_score_dict[n_clusters][2]
+        
+        # Create a subplot with 1 row and 2 columns
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig.set_size_inches(18, 7)
+    
+        # The 1st subplot is the silhouette plot
+        ax1.set_xlim([-1, 1])
+        # The (n_clusters+1)*10 is for inserting blank space between silhouette
+        # plots of individual clusters, to demarcate them clearly.
+        ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
+    
+        # Initialize the clusterer with n_clusters value and a random generator
+        # seed of 10 for reproducibility.
+        cluster_labels = np.array(silhouette_score_dict[n_clusters][1], dtype=np.int32)
+
+        # The silhouette_score gives the average value for all the samples.
+        # This gives a perspective into the density and separation of the formed
+        # clusters
+        silhouette_avg = silhouette_score_dict[n_clusters][0]
+    
+        # Compute the silhouette scores for each sample
+        sample_silhouette_values = silhouette_samples(X, cluster_labels)
+    
+        y_lower = 10
+        for i in range(n_clusters):
+            # Aggregate the silhouette scores for samples belonging to
+            # cluster i, and sort them
+            ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+    
+            ith_cluster_silhouette_values.sort()
+    
+            size_cluster_i = ith_cluster_silhouette_values.shape[0]
+            y_upper = y_lower + size_cluster_i
+    
+            color = cm.nipy_spectral(float(i) / n_clusters)
+            ax1.fill_betweenx(
+                np.arange(y_lower, y_upper),
+                0,
+                ith_cluster_silhouette_values,
+                facecolor=color,
+                edgecolor=color,
+                alpha=0.7,
+            )
+    
+            # Label the silhouette plots with their cluster numbers at the middle
+            ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+    
+            # Compute the new y_lower for next plot
+            y_lower = y_upper + 10  # 10 for the 0 samples
+    
+        ax1.set_title("The silhouette plot for the various clusters.")
+        ax1.set_xlabel("The silhouette coefficient values")
+        ax1.set_ylabel("Cluster label")
+    
+        # The vertical line for average silhouette score of all the values
+        ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+    
+        ax1.set_yticks([])  # Clear the yaxis labels / ticks
+        ax1.set_xticks([-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1])
+    
+        # 2nd Plot showing the actual clusters formed
+        deepof.visuals.plot_embeddings(
+            my_deepof_project,
+            silhouette_score_dict[n_clusters][3],
+            silhouette_score_dict[n_clusters][4],
+            silhouette_score_dict[n_clusters][5],
+            aggregate_experiments=False,
+            samples=100,
+            # ax=ax2,
+            save=False, # Set to True, or give a custom name, to save the plot
+        )
+    
+        plt.show()
+        
+
+# If epochs=10, latent_dim=4, batch_size=1024 -> max=0.39 (cluster 8)
+# If epochs=150, latent_dim=8, batch_size=64 -> just identifies one cluster
+# silhouette_score_dict: epochs=150, latent_dim=8, batch_size=1024 (2h/num) -> negative numbers
+# silhouette_score_dict_2: epochs=10, latent_dim=8, batch_size=1024 (50min/num) -> max=0.13 (cluster 8)
+# silhouette_score_dict_3: epochs=20, latent_dim=8, batch_size=1024 (70min/num) -> 0.03 (cluster 8)
+
 # =============================================================================
-# Load a previously saved project and supervised analysis
+# Load a previously saved project and supervised/unsupervised analysis
 my_deepof_project = deepof.data.load_project(directory_output + "deepof_tutorial_project")
 my_deepof_project.load_exp_conditions(directory_output + 'conditions.csv')
+
 with open(directory_output + 'supervised_annotation.pkl', 'rb') as file:
     supervised_annotation = pickle.load(file)
-with open(directory_output + 'embeddings.pkl', 'rb') as file:
-    embeddings = pickle.load(file)
-with open(directory_output + 'soft_counts.pkl', 'rb') as file:
-    soft_counts = pickle.load(file)
-with open(directory_output + 'breaks.pkl', 'rb') as file:
-    breaks = pickle.load(file)
+
 
 # =============================================================================
 # Heatmaps

@@ -13,7 +13,6 @@ import matplotlib.patches as mpatches
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.signal import savgol_filter
 from sklearn.metrics import confusion_matrix
-from sklearn.decomposition import PCA
 from statannotations.Annotator import Annotator
 from typing import Any, List, NewType, Union
 import calendar
@@ -1236,8 +1235,7 @@ def plot_embeddings(
     save: bool = False,
     my_title: str = '',
     my_color_dict: dict = None,
-    my_coords_dict: dict = None,
-    given_pca: PCA = None
+    my_coords_dict: dict = None
     ):
     """Return a scatter plot of the passed projection. Allows for temporal and quality filtering, animal aggregation, and changepoint detection size visualization.
 
@@ -1354,18 +1352,18 @@ def plot_embeddings(
 
         # Aggregate experiments by time on cluster
         if aggregate_experiments == "time on cluster":
-            aggregated_embeddings, pca = post_hoc_customized.get_time_on_cluster(
-                counts_to_plot, breaks_to_plot, given_pca, reduce_dim=True
+            aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_time_on_cluster(
+                counts_to_plot, breaks_to_plot, reduce_dim=True
             )
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
-                    emb_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                    emb_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
-                    sup_annots_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                    sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
 
         # Generate unifier dataset using the reduced aggregated embeddings and experimental conditions
@@ -1455,7 +1453,6 @@ def plot_embeddings(
     ax.xaxis.grid(False)
     ax.xaxis.label.set_color(grey_stark)
     ax.yaxis.label.set_color(grey_stark)
-    explained_variance = pca.explained_variance_ratio_
     ax.set_xlabel('PC1 (' + str(explained_variance[0]*100)[:4] + '%)')
     ax.set_ylabel('PC2 (' + str(explained_variance[1]*100)[:4] + '%)')
     
@@ -1466,7 +1463,7 @@ def plot_embeddings(
     if ax.legend_ is not None:
         ax.legend().remove()          
     
-    return ax, embedding_dataset, dataframe_for_titles, pca
+    return ax, embedding_dataset, rotated_loading_scores, dataframe_for_titles
 
 
 def plot_embeddings_timelapse(
@@ -1498,7 +1495,6 @@ def plot_embeddings_timelapse(
     my_color_dict: dict = None,
     my_coords_dict: dict = None,
     specific_condition: str = None,
-    given_pca: PCA = None
     ):
     """Return a scatter plot of the passed projection. Allows for temporal and quality filtering, animal aggregation, and changepoint detection size visualization.
 
@@ -1641,18 +1637,18 @@ def plot_embeddings_timelapse(
 
         # Aggregate experiments by time on cluster
         if aggregate_experiments == "time on cluster":
-            aggregated_embeddings, pca = post_hoc_customized.get_time_on_cluster(
-                counts_to_plot, breaks_to_plot, given_pca, reduce_dim=True
+            aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_time_on_cluster(
+                counts_to_plot, breaks_to_plot, reduce_dim=True
             )
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
-                    emb_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                    emb_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
-                    sup_annots_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
+                    sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
                 )
 
         # Generate unifier dataset using the reduced aggregated embeddings and experimental conditions
@@ -1742,7 +1738,6 @@ def plot_embeddings_timelapse(
     ax.xaxis.grid(False)
     ax.xaxis.label.set_color(grey_stark)
     ax.yaxis.label.set_color(grey_stark)
-    explained_variance = pca.explained_variance_ratio_
     ax.set_xlabel('PC1 (' + str(explained_variance[0]*100)[:4] + '%)')
     ax.set_ylabel('PC2 (' + str(explained_variance[1]*100)[:4] + '%)')
     
@@ -1753,7 +1748,7 @@ def plot_embeddings_timelapse(
     if ax.legend_ is not None:
         ax.legend().remove()          
     
-    return ax, embedding_dataset, dataframe_for_titles, concat_hue, pca
+    return ax, embedding_dataset, rotated_loading_scores, dataframe_for_titles, concat_hue
 
 
 
@@ -3222,10 +3217,8 @@ def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
         
     # Display the variable names and their corresponding loading scores
     features = next(iter(dataframe_for_titles.values())).columns.tolist()
-    if pca == 'PCA-1':
-        pc_loading_scores = rotated_loading_scores[0, :] # PC1
-    elif pca == 'PCA-2':
-        pc_loading_scores = rotated_loading_scores[1, :] # PC2
+    # pc_loading_scores = rotated_loading_scores[0, :] # PC1
+    pc_loading_scores = rotated_loading_scores[1, :] # PC2
     loading_scores_df = pd.DataFrame({'Variable': features, 'PC_Loading': pc_loading_scores})
     loading_scores_df = loading_scores_df.reindex(loading_scores_df['PC_Loading'].abs().sort_values(ascending=False).index)
     loading_scores_df.drop(loading_scores_df[loading_scores_df['PC_Loading'] == 0].index, inplace=True)
