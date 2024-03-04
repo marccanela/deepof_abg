@@ -77,7 +77,7 @@ graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler = my_deepof_
 def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler):
     # start_time = time.time()
     silhouette_score_dict = {}
-    num_clusters = list(range(2, 26))
+    num_clusters = list(range(2, 16))
     # num_clusters = [8]
     
     for num in num_clusters:
@@ -85,13 +85,13 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
             preprocessed_object=graph_preprocessed_coords, # Change to preprocessed_coords to use non-graph embeddings
             adjacency_matrix=adj_matrix,
             embedding_model="VaDE", # Can also be set to 'VQVAE' and 'Contrastive'
-            epochs=10,
+            epochs=10, # (Default 10)
             encoder_type="recurrent", # Can also be set to 'TCN' and 'transformer'
-            n_components=num,
-            latent_dim=4, # Dimention size of the latent space (aka, number of embeddings)
-            batch_size=1024,
+            n_components=num, # (Default 10)
+            latent_dim=4, # Dimention size of the latent space (aka, number of embeddings) (Default 4)
+            batch_size=1024, # (Default 1024)
             verbose=True, # Set to True to follow the training loop
-            interaction_regularization=0.0,
+            interaction_regularization=0.0, # Change to 0.25 when multianimal
             pretrained=False, # Set to False to train a new model!
         )
         embeddings, soft_counts, breaks = deepof.model_utils.embedding_per_video(
@@ -101,6 +101,29 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
             # animal_id='nocolor', # Comment out for multi-animal embeddings
             global_scaler=global_scaler,
         )
+        
+        silhouette_score_dict[num] = [embeddings, soft_counts, breaks]
+        
+    return silhouette_score_dict
+
+silhouette_score_dict = silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler)
+
+with open('/home/sie/Desktop/marc/brain_01a02/silhouette_score_dict.pkl', 'wb') as file:
+    pickle.dump(silhouette_score_dict, file)
+with open('/home/sie/Desktop/marc/brain_01a02/silhouette_score_dict.pkl', 'rb') as file:
+    silhouette_score_dict = pickle.load(file)
+
+def create_silhouette_score_dict(silhouette_score_dict):
+    new_silhouette_score_dict = {}
+    
+    # for n in [10,11,12,18]:
+    #     del silhouette_score_dict[n]
+
+    for key, value in silhouette_score_dict.items():
+        print('Analyzing ' + str(key))
+        embeddings = value[0]
+        soft_counts = value[1]
+        breaks = value[2]
         
         hard_counts = {}
         for individual, clusters_probabilities in soft_counts.items():
@@ -113,21 +136,23 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
         combined_embeddings = np.concatenate(list(embeddings.values()), axis=0)
         score = silhouette_score(combined_embeddings, combined_hard_counts,
                                  sample_size=10000, random_state=42)
-        
-        silhouette_score_dict[num] = [score, combined_hard_counts, combined_embeddings, embeddings, soft_counts, breaks]
-        
-    return silhouette_score_dict
+
+        new_silhouette_score_dict[key] = [score, combined_hard_counts, combined_embeddings, embeddings, soft_counts, breaks]
     
-silhouette_score_dict = silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler)
+    return new_silhouette_score_dict
+
+new_silhouette_score_dict = create_silhouette_score_dict(silhouette_score_dict)
 
 with open(directory_output + 'silhouettes_epochs10_dim4_batch1024.pkl', 'wb') as file:
     pickle.dump(silhouette_score_dict, file)
 
-def plot_silhouette_scores(silhouette_score_dict):
-    silhouette_scores = [value[0] for value in silhouette_score_dict.values()]
 
+def plot_silhouette_scores(new_silhouette_score_dict):
+    silhouette_scores = [value[0] for value in silhouette_score_dict.values()]
+    result_list = [x for x in new_silhouette_score_dict.keys()]
+    scores = [x[0] for x in new_silhouette_score_dict.values()]
     plt.figure(figsize=(8, 3))
-    plt.plot(range(2, 26), silhouette_scores, "bo-")
+    plt.plot(result_list, scores, "bo-")
     plt.xlabel("$k$")
     plt.ylabel("Silhouette score")
     plt.axis([1.8, 25.5, -1, 1])
@@ -136,9 +161,9 @@ def plot_silhouette_scores(silhouette_score_dict):
     plt.show()
 
 
-def silhouette_diagrams(silhouette_score_dict):
+def silhouette_diagrams(silhouette_score_dict=new_silhouette_score_dict):
     
-    range_n_clusters = [2,3,15]
+    range_n_clusters = [8]
     for n_clusters in range_n_clusters:
         X = silhouette_score_dict[n_clusters][2]
         
@@ -216,7 +241,9 @@ def silhouette_diagrams(silhouette_score_dict):
         plt.show()
         
 
-# If epochs=10, latent_dim=4, batch_size=1024 -> max=0.39 (cluster 8)
+# If epochs=10, latent_dim=4, batch_size=1024 -> max=0.39 (num_clusters=8)
+# If epochs=50, latent_dim=4, batch_size=1024 -> irregular silhouettes, total_loss = ~50
+# If epochs=10, latent_dim=6, batch_size=1024 -> 
 # If epochs=150, latent_dim=8, batch_size=64 -> just identifies one cluster
 # silhouette_score_dict: epochs=150, latent_dim=8, batch_size=1024 (2h/num) -> negative numbers
 # silhouette_score_dict_2: epochs=10, latent_dim=8, batch_size=1024 (50min/num) -> max=0.13 (cluster 8)
