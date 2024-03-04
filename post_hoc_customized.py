@@ -454,7 +454,8 @@ def condition_distance_binning(
         )
 
     if scan_mode == "per-bin":
-        bin_range = range(end_bin // step_bin + 1)
+        # bin_range = range(end_bin // step_bin + 1)
+        bin_range = range(end_bin // step_bin) # Modified by mcanela
     elif scan_mode == "growing_window":
         bin_range = range(start_bin, end_bin, step_bin)
     else:
