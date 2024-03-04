@@ -489,7 +489,7 @@ def separation_between_conditions(
     """
     # Aggregate embeddings and add experimental conditions
     if agg == "time_on_cluster":
-        aggregated_embeddings = get_time_on_cluster(
+        aggregated_embeddings, _, _ = get_time_on_cluster( # Modified by mcanela
             cur_soft_counts, cur_breaks, reduce_dim=True
         )
     elif agg in ["mean", "median"]:
