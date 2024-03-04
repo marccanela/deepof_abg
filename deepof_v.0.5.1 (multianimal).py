@@ -143,102 +143,13 @@ def create_silhouette_score_dict(silhouette_score_dict):
 
 new_silhouette_score_dict = create_silhouette_score_dict(silhouette_score_dict)
 
-with open(directory_output + 'silhouettes_epochs10_dim4_batch1024.pkl', 'wb') as file:
-    pickle.dump(silhouette_score_dict, file)
+with open(directory_output + 'new_silhouette_score_dict.pkl', 'wb') as file:
+    pickle.dump(new_silhouette_score_dict, file)
+with open(directory_output + 'new_silhouette_score_dict.pkl', 'rb') as file:
+    new_silhouette_score_dict = pickle.load(file)
 
 
-def plot_silhouette_scores(new_silhouette_score_dict):
-    silhouette_scores = [value[0] for value in silhouette_score_dict.values()]
-    result_list = [x for x in new_silhouette_score_dict.keys()]
-    scores = [x[0] for x in new_silhouette_score_dict.values()]
-    plt.figure(figsize=(8, 3))
-    plt.plot(result_list, scores, "bo-")
-    plt.xlabel("$k$")
-    plt.ylabel("Silhouette score")
-    plt.axis([1.8, 25.5, -1, 1])
-    plt.grid()
-    plt.hlines(0, 1.8, 25.5)
-    plt.show()
 
-
-def silhouette_diagrams(silhouette_score_dict=new_silhouette_score_dict):
-    
-    range_n_clusters = [8]
-    for n_clusters in range_n_clusters:
-        X = silhouette_score_dict[n_clusters][2]
-        
-        # Create a subplot with 1 row and 2 columns
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        fig.set_size_inches(18, 7)
-    
-        # The 1st subplot is the silhouette plot
-        ax1.set_xlim([-1, 1])
-        # The (n_clusters+1)*10 is for inserting blank space between silhouette
-        # plots of individual clusters, to demarcate them clearly.
-        ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
-    
-        # Initialize the clusterer with n_clusters value and a random generator
-        # seed of 10 for reproducibility.
-        cluster_labels = np.array(silhouette_score_dict[n_clusters][1], dtype=np.int32)
-
-        # The silhouette_score gives the average value for all the samples.
-        # This gives a perspective into the density and separation of the formed
-        # clusters
-        silhouette_avg = silhouette_score_dict[n_clusters][0]
-    
-        # Compute the silhouette scores for each sample
-        sample_silhouette_values = silhouette_samples(X, cluster_labels)
-    
-        y_lower = 10
-        for i in range(n_clusters):
-            # Aggregate the silhouette scores for samples belonging to
-            # cluster i, and sort them
-            ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
-    
-            ith_cluster_silhouette_values.sort()
-    
-            size_cluster_i = ith_cluster_silhouette_values.shape[0]
-            y_upper = y_lower + size_cluster_i
-    
-            color = cm.nipy_spectral(float(i) / n_clusters)
-            ax1.fill_betweenx(
-                np.arange(y_lower, y_upper),
-                0,
-                ith_cluster_silhouette_values,
-                facecolor=color,
-                edgecolor=color,
-                alpha=0.7,
-            )
-    
-            # Label the silhouette plots with their cluster numbers at the middle
-            ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
-    
-            # Compute the new y_lower for next plot
-            y_lower = y_upper + 10  # 10 for the 0 samples
-    
-        ax1.set_title("The silhouette plot for the various clusters.")
-        ax1.set_xlabel("The silhouette coefficient values")
-        ax1.set_ylabel("Cluster label")
-    
-        # The vertical line for average silhouette score of all the values
-        ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
-    
-        ax1.set_yticks([])  # Clear the yaxis labels / ticks
-        ax1.set_xticks([-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1])
-    
-        # 2nd Plot showing the actual clusters formed
-        deepof.visuals.plot_embeddings(
-            my_deepof_project,
-            silhouette_score_dict[n_clusters][3],
-            silhouette_score_dict[n_clusters][4],
-            silhouette_score_dict[n_clusters][5],
-            aggregate_experiments=False,
-            samples=100,
-            # ax=ax2,
-            save=False, # Set to True, or give a custom name, to save the plot
-        )
-    
-        plt.show()
         
 
 # If epochs=10, latent_dim=4, batch_size=1024 -> max=0.39 (num_clusters=8)
@@ -257,6 +168,9 @@ my_deepof_project.load_exp_conditions(directory_output + 'conditions.csv')
 with open(directory_output + 'supervised_annotation.pkl', 'rb') as file:
     supervised_annotation = pickle.load(file)
 
+# =============================================================================
+# 
+# =============================================================================
 
 # =============================================================================
 # Heatmaps
