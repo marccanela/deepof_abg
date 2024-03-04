@@ -36,6 +36,8 @@ import warnings
 import copy
 
 import deepof.data
+from itertools import combinations
+import math
 
 # DEFINE CUSTOM ANNOTATED TYPES #
 project = NewType("deepof_project", Any)
@@ -489,11 +491,11 @@ def separation_between_conditions(
     """
     # Aggregate embeddings and add experimental conditions
     if agg == "time_on_cluster":
-        aggregated_embeddings, _, _ = get_time_on_cluster( # Modified by mcanela
+        aggregated_embeddings, _, _ = get_time_on_cluster(                  # Modified by mcanela
             cur_soft_counts, cur_breaks, reduce_dim=True
         )
     elif agg in ["mean", "median"]:
-        aggregated_embeddings = get_aggregated_embedding(
+        aggregated_embeddings, _, _ = get_aggregated_embedding(             # Modified by mcanela
             cur_embedding, agg=agg, reduce_dim=True
         )
 
@@ -532,9 +534,19 @@ def separation_between_conditions(
                 for arr in arrays_to_compare
             ]
 
-            current_distance = ot.sliced_wasserstein_distance(
-                *arrays_to_compare, n_projections=10000
-            )
+            # Added by mcanela
+            # If there's more than one condition, we'll need to calculate the mean
+            #current_distance = ot.sliced_wasserstein_distance(
+            #    *arrays_to_compare, n_projections=10000
+            #)
+            distance_list = []
+            for combination in list(combinations(range(1, len(arrays_to_compare)+1), 2)):
+                new_list = [arrays_to_compare[combination[0]-1], arrays_to_compare[combination[1]-1]]
+                current_distance = ot.sliced_wasserstein_distance(
+                                *new_list, n_projections=10000
+                            )
+                distance_list.append(current_distance)
+            current_distance = np.mean(distance_list)           
 
     return current_distance
 
