@@ -2731,9 +2731,11 @@ def plot_distance_between_conditions(
     soft_counts: dict,
     breaks: dict,
     exp_condition: str,
+    start_seconds_bin: int,
+    end_seconds_bin: int,
     embedding_aggregation_method: str = "median",
     distance_metric: str = "wasserstein",
-    n_jobs: int = -1,
+    n_jobs: int = -1, 
     save: bool = False,
     ax: Any = None,
 ):
@@ -2755,8 +2757,14 @@ def plot_distance_between_conditions(
         ax (plt.AxesSubplot): axes where to plot the current figure. If not provided, new figure will be created.
 
     """
+
+    start_bin = start_seconds_bin * coordinates._frame_rate
+    end_bin = end_seconds_bin * coordinates._frame_rate
+    # end_bin = np.min([val.shape[0] for val in soft_counts.values()])
+    step_bin = coordinates._frame_rate
+
     # Get distance between distributions across the growing window
-    distance_array = deepof.post_hoc.condition_distance_binning(
+    distance_array = post_hoc_customized.condition_distance_binning(
         embedding,
         soft_counts,
         breaks,
@@ -2764,9 +2772,9 @@ def plot_distance_between_conditions(
             key: val[exp_condition].values[0]
             for key, val in coordinates.get_exp_conditions.items()
         },
-        10 * coordinates._frame_rate,
-        np.min([val.shape[0] for val in soft_counts.values()]),
-        coordinates._frame_rate,
+        start_bin,
+        end_bin,
+        step_bin,
         agg=embedding_aggregation_method,
         metric=distance_metric,
         n_jobs=n_jobs,
