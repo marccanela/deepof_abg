@@ -2783,7 +2783,7 @@ def plot_distance_between_conditions(
     optimal_bin = np.argmax(savgol_filter(distance_array, 10, 2)) + 10
     print("Found an optimal_bin at {} seconds".format(optimal_bin))
 
-    distance_per_bin = deepof.post_hoc.condition_distance_binning(
+    distance_per_bin = post_hoc_customized.condition_distance_binning(
         embedding,
         soft_counts,
         breaks,
@@ -2791,8 +2791,8 @@ def plot_distance_between_conditions(
             key: val[exp_condition].values[0]
             for key, val in coordinates.get_exp_conditions.items()
         },
-        10 * coordinates._frame_rate,
-        np.min([val.shape[0] for val in soft_counts.values()]),
+        start_bin,
+        end_bin,
         optimal_bin * coordinates._frame_rate,
         agg=embedding_aggregation_method,
         scan_mode="per-bin",
