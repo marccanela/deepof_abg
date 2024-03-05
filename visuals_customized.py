@@ -37,6 +37,38 @@ from sklearn.metrics import silhouette_samples, silhouette_score
 import matplotlib.cm as cm
 
 
+from collections import defaultdict
+from collections.abc import Sequence
+from itertools import product, combinations
+from matplotlib.animation import FuncAnimation, FFMpegWriter
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.patches import Ellipse
+import matplotlib.patches as mpatches
+from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.signal import savgol_filter
+from sklearn.metrics import confusion_matrix
+from sklearn.decomposition import PCA
+from statannotations.Annotator import Annotator
+from typing import Any, List, NewType, Union
+import calendar
+import copy
+import cv2
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import os
+import pandas as pd
+import re
+import seaborn as sns
+import shap
+import tensorflow as tf
+import time
+import warnings
+
+import deepof.post_hoc
+import post_hoc_customized
+
 # DEFINE CUSTOM ANNOTATED TYPES #
 project = NewType("deepof_project", Any)
 coordinates = NewType("deepof_coordinates", Any)
