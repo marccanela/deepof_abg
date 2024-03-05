@@ -1237,7 +1237,8 @@ def plot_embeddings(
     save: bool = False,
     my_title: str = '',
     my_color_dict: dict = None,
-    my_coords_dict: dict = None
+    my_coords_dict: dict = None,
+    given_pca: PCA = None
     ):
     """Return a scatter plot of the passed projection. Allows for temporal and quality filtering, animal aggregation, and changepoint detection size visualization.
 
@@ -1354,18 +1355,18 @@ def plot_embeddings(
 
         # Aggregate experiments by time on cluster
         if aggregate_experiments == "time on cluster":
-            aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_time_on_cluster(
-                counts_to_plot, breaks_to_plot, reduce_dim=True
+            aggregated_embeddings, pca = post_hoc_customized.get_time_on_cluster(
+                counts_to_plot, breaks_to_plot, given_pca, reduce_dim=True
             )
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
-                    emb_to_plot, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
+                    emb_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
-                    sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
+                    sup_annots_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
                 )
 
         # Generate unifier dataset using the reduced aggregated embeddings and experimental conditions
@@ -1455,6 +1456,7 @@ def plot_embeddings(
     ax.xaxis.grid(False)
     ax.xaxis.label.set_color(grey_stark)
     ax.yaxis.label.set_color(grey_stark)
+    explained_variance = pca.explained_variance_ratio_
     ax.set_xlabel('PC1 (' + str(explained_variance[0]*100)[:4] + '%)')
     ax.set_ylabel('PC2 (' + str(explained_variance[1]*100)[:4] + '%)')
     
@@ -1465,7 +1467,7 @@ def plot_embeddings(
     if ax.legend_ is not None:
         ax.legend().remove()          
     
-    return ax, embedding_dataset, rotated_loading_scores, dataframe_for_titles
+    return ax, embedding_dataset, dataframe_for_titles, pca
 
 
 def plot_embeddings_timelapse(
@@ -1497,6 +1499,7 @@ def plot_embeddings_timelapse(
     my_color_dict: dict = None,
     my_coords_dict: dict = None,
     specific_condition: str = None,
+    given_pca: PCA = None
     ):
     """Return a scatter plot of the passed projection. Allows for temporal and quality filtering, animal aggregation, and changepoint detection size visualization.
 
@@ -1639,18 +1642,18 @@ def plot_embeddings_timelapse(
 
         # Aggregate experiments by time on cluster
         if aggregate_experiments == "time on cluster":
-            aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_time_on_cluster(
-                counts_to_plot, breaks_to_plot, reduce_dim=True
+            aggregated_embeddings, pca = post_hoc_customized.get_time_on_cluster(
+                counts_to_plot, breaks_to_plot, given_pca, reduce_dim=True
             )
 
         else:
             if emb_to_plot is not None:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
-                    emb_to_plot, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
+                    emb_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
                 )
             else:
-                aggregated_embeddings, explained_variance, rotated_loading_scores = post_hoc_customized.get_aggregated_embedding(
-                    sup_annots_to_plot, agg=aggregate_experiments, reduce_dim=True
+                aggregated_embeddings, pca = post_hoc_customized.get_aggregated_embedding(
+                    sup_annots_to_plot, given_pca, agg=aggregate_experiments, reduce_dim=True
                 )
 
         # Generate unifier dataset using the reduced aggregated embeddings and experimental conditions
@@ -1740,6 +1743,7 @@ def plot_embeddings_timelapse(
     ax.xaxis.grid(False)
     ax.xaxis.label.set_color(grey_stark)
     ax.yaxis.label.set_color(grey_stark)
+    explained_variance = pca.explained_variance_ratio_
     ax.set_xlabel('PC1 (' + str(explained_variance[0]*100)[:4] + '%)')
     ax.set_ylabel('PC2 (' + str(explained_variance[1]*100)[:4] + '%)')
     
@@ -1750,9 +1754,7 @@ def plot_embeddings_timelapse(
     if ax.legend_ is not None:
         ax.legend().remove()          
     
-    return ax, embedding_dataset, rotated_loading_scores, dataframe_for_titles, concat_hue
-
-
+    return ax, embedding_dataset, dataframe_for_titles, concat_hue, pca
 
 
 def _scatter_embeddings(
@@ -1973,6 +1975,10 @@ def _process_animation_data(
 def animate_skeleton(
     coordinates: coordinates,
     experiment_id: str,
+    x_min: int,
+    x_max: int,
+    y_min: int, 
+    y_max: int,
     animal_id: list = None,
     center: str = "arena",
     align: str = None,
@@ -2127,7 +2133,7 @@ def animate_skeleton(
         )
         tail_lines.append(ax2.plot(*aid[2][0, :].reshape(-1, 2).T))
 
-    if display_arena and center in [False, "arena"] and align is None:
+    if display_arena and center not in [False, "arena"] and align is None:
         i = np.argmax(np.array(list(coordinates.get_coords().keys())) == experiment_id)
         plot_arena(coordinates, center, "black", ax2, i)
 
@@ -2177,9 +2183,8 @@ def animate_skeleton(
     ax2.set_ylabel("y")
 
     if center not in [False, "arena"]:
-
-        ax2.set_xlim(-1.5 * x_dv, 1.5 * x_dv)
-        ax2.set_ylim(-1.5 * y_dv, 1.5 * y_dv)
+        ax2.set_xlim(x_min, x_max)
+        ax2.set_ylim(y_min, y_max)
 
     plt.tight_layout()
 
