@@ -2865,7 +2865,7 @@ def plot_distance_between_conditions(
 
     if ax is None:
         plt.title("deepOF - distance between conditions")
-        plt.xlim(0, len(distance_array) + coordinates._frame_rate)
+        plt.xlim(start_bin, end_bin + coordinates._frame_rate)
         plt.tight_layout()
 
     if save:  # pragma: no cover
@@ -2883,6 +2883,115 @@ def plot_distance_between_conditions(
                 ),
             )
         )
+
+
+def plot_distance_between_conditions_custom(
+    # Model selection parameters
+    coordinates: coordinates,
+    embedding: dict,
+    soft_counts: dict,
+    breaks: dict,
+    exp_condition: str,
+    start_seconds_bin: int,
+    end_seconds_bin: int,
+    embedding_aggregation_method: str = "median",
+    distance_metric: str = "wasserstein",
+    n_jobs: int = -1, 
+    save: bool = False,
+    ax: Any = None,
+):
+    """Plot the distance between conditions across a growing time window.
+
+    Finds an optimal separation binning based on the distance between conditions, and plots it across all non-overlapping bins.
+    Useful, for example, to measure habituation over time.
+
+    Args:
+        coordinates (coordinates): coordinates object for the current project. Used to get video paths.
+        embedding (dict): embedding object for the current project. Used to get video paths.
+        soft_counts (dict): dictionary with soft_counts per experiment.
+        breaks (dict): dictionary with break lengths for each video.
+        exp_condition (str): experimental condition to use for the distance calculation.
+        embedding_aggregation_method (str): method to use for aggregating the embedding. Options are 'time_on_cluster' and 'mean'.
+        distance_metric (str): distance metric to use for the distance calculation. Options are 'wasserstein' and 'euclidean'.
+        n_jobs (int): number of jobs to use for the distance calculation.
+        save (bool): if True, saves the figure to the project directory.
+        ax (plt.AxesSubplot): axes where to plot the current figure. If not provided, new figure will be created.
+
+    """
+
+    start_bin = start_seconds_bin * coordinates._frame_rate
+    end_bin = end_seconds_bin * coordinates._frame_rate
+    # end_bin = np.min([val.shape[0] for val in soft_counts.values()])
+    # step_bin = coordinates._frame_rate
+    step_bin = coordinates._frame_rate * 60
+
+    # Get distance between distributions across the growing window
+    distance_array = post_hoc_customized.condition_distance_binning_customized(
+        embedding,
+        soft_counts,
+        breaks,
+        {key: val[exp_condition].values[0] for key, val in coordinates.get_exp_conditions.items()},
+        start_bin,
+        end_bin,
+        step_bin,
+        agg=embedding_aggregation_method,
+        metric=distance_metric,
+        n_jobs=n_jobs,
+    )
+
+    # Concatenate both arrays and create a px compatible data frame
+    distance_df = pd.DataFrame(
+        {
+            exp_condition: distance_array,
+            "Time": np.linspace(
+                # 10,
+                # np.min([val.shape[0] for val in soft_counts.values()]),
+                # len(distance_array),
+                step_bin / coordinates._frame_rate / 2,
+                end_seconds_bin - (step_bin / coordinates._frame_rate / 2),
+                len(distance_array),
+            )
+            # / coordinates._frame_rate,
+        }
+    ).melt(
+        id_vars=["Time"],
+        value_name=distance_metric,
+        var_name="experimental setting",
+    )
+
+
+
+    # Plot the obtained distance array
+    sns.lineplot(
+        data=distance_df,
+        x="Time",
+        y=distance_metric,
+        color="#636466",
+        ax=ax,
+    )
+
+    if ax is None:
+        plt.title("deepOF - distance between conditions")
+        plt.xlim(0, end_seconds_bin)
+        plt.xticks([0, 60, 120, 180, 240, 300, 360])
+        plt.tight_layout()
+
+    if save:  # pragma: no cover
+        plt.savefig(
+            os.path.join(
+                coordinates._project_path,
+                coordinates._project_name,
+                "Figures",
+                "deepof_distance_between_conditions_{}{}_{}_{}_{}.pdf".format(
+                    exp_condition,
+                    embedding_aggregation_method,
+                    distance_metric,
+                    (f"_{save}" if isinstance(save, str) else ""),
+                    calendar.timegm(time.gmtime()),
+                ),
+            )
+        )
+
 
 
 def tag_annotated_frames(

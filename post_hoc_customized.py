@@ -419,30 +419,9 @@ def condition_distance_binning(
     """
     # Divide the embeddings in as many corresponding bins, and compute distances
     def embedding_distance(bin_index):
-
-        if scan_mode == "per-bin":
-
-            cur_embedding, cur_soft_counts, cur_breaks, _ = select_time_bin(
-                embedding, soft_counts, breaks, bin_size=step_bin, bin_index=bin_index
-            )
-
-        elif scan_mode == "growing_window":
-            cur_embedding, cur_soft_counts, cur_breaks, _ = select_time_bin(
-                embedding, soft_counts, breaks, bin_size=bin_index, bin_index=0
-            )
-
-        else:
-            assert precomputed_bins is not None, (
-                "For precomputed binning, provide a numpy array with bin IDs under "
-                "the precomputed_bins parameter"
-            )
-
-            cur_embedding, cur_soft_counts, cur_breaks, _ = select_time_bin(
-                embedding,
-                soft_counts,
-                breaks,
-                precomputed=(precomputed_bins == bin_index),
-            )
+        cur_embedding, cur_soft_counts, cur_breaks, _ = select_time_bin(
+            embedding, soft_counts, breaks, bin_size=step_bin, bin_index=bin_index
+        )
 
         return separation_between_conditions(
             cur_embedding,
@@ -458,14 +437,78 @@ def condition_distance_binning(
         bin_range = range(end_bin // step_bin) # Modified by mcanela
     elif scan_mode == "growing_window":
         bin_range = range(start_bin, end_bin, step_bin)
-    else:
-        bin_range = pd.Series(precomputed_bins).unique()
 
     exp_condition_distance_array = Parallel(n_jobs=n_jobs)(
         delayed(embedding_distance)(bin_index) for bin_index in bin_range
     )
 
     return np.array(exp_condition_distance_array)
+
+
+def condition_distance_binning_customized(
+    embedding: table_dict,
+    soft_counts: table_dict,
+    breaks: table_dict,
+    exp_conditions: dict,
+    start_bin: int = None,
+    end_bin: int = None,
+    step_bin: int = None,
+    scan_mode: str = "growing_window",
+    precomputed_bins: np.ndarray = None,
+    agg: str = "mean",
+    metric: str = "auc",
+    n_jobs: int = cpu_count(),
+):
+    """Compute the distance between the embeddings of two conditions, using the specified aggregation method.
+
+    Args:
+        embedding (TableDict): A dictionary of embeddings, where the keys are the names of the experimental conditions, and the values are the embeddings for each condition.
+        soft_counts (TableDict): A dictionary of soft counts, where the keys are the names of the experimental conditions, and the values are the soft counts for each condition.
+        breaks (TableDict): A dictionary of breaks, where the keys are the names of the experimental conditions, and the values are the breaks for each condition.
+        exp_conditions (dict): A dictionary of experimental conditions, where the keys are the names of the experiments, and the values are the names of their corresponding experimental conditions.
+        start_bin (int): The index of the first bin to compute the distance for.
+        end_bin (int): The index of the last bin to compute the distance for.
+        step_bin (int): The step size of the bins to compute the distance for.
+        scan_mode (str): The mode to use for computing the distance. Can be one of "growing-window" (used to select optimal binning), "per-bin" (used to evaluate how discriminability evolves in subsequent bins of a specified size) or "precomputed", which requires a numpy ndarray with bin IDs to be passed to precomputed_bins.
+        precomputed_bins (np.ndarray): numpy array with IDs mapping to different bins, not necessarily having the same size. Difference across conditions for each of these bins will be reported.
+        agg (str): The aggregation method to use. Can be either "mean", "median", or "time_on_cluster".
+        metric (str): The distance metric to use. Can be either "auc" (where the reported 'distance' is based on performance of a classifier when separating aggregated embeddings), or "wasserstein" (which computes distances based on optimal transport).
+        n_jobs (int): The number of jobs to use for parallel processing.
+
+    Returns:
+        An array with distances between conditions across the resulting time bins
+
+    """
+    # Divide the embeddings in as many corresponding bins, and compute distances
+    def embedding_distance(bin_index):
+
+        cur_embedding, cur_soft_counts, cur_breaks, _ = select_time_bin(
+            embedding, soft_counts, breaks, bin_size=step_bin, bin_index=bin_index
+        )
+
+        return separation_between_conditions(
+            cur_embedding,
+            cur_soft_counts,
+            cur_breaks,
+            exp_conditions,
+            agg,
+            metric=metric,
+        )
+    
+    total_windows = len(next(iter(embedding.values())))
+    # window_indices = [i for i in range(total_windows)]
+    bin_range = range(total_windows // step_bin + 1) # Modified by mcanela
+    a = [x for x in bin_range]
+    
+    # filtered_frame_indices = [idx for idx in window_indices if start_bin <= idx <= end_bin]
+    # bin_range = range(0, end_bin-start_bin, step_bin)
+
+    exp_condition_distance_array = Parallel(n_jobs=n_jobs)(
+        delayed(embedding_distance)(bin_index) for bin_index in a
+    )
+
+    return np.array(exp_condition_distance_array)
+
 
 
 def separation_between_conditions(
