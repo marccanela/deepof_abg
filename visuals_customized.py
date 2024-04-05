@@ -31,6 +31,7 @@ import tensorflow as tf
 import time
 import warnings
 from sklearn.decomposition import PCA
+import pingouin as pg
 
 import deepof.post_hoc
 import post_hoc_customized
@@ -1003,8 +1004,14 @@ def _filter_embeddings(
     bin_size,
     bin_index,
     precomputed_bins,
+    col = None
 ):
     """Auxiliary function to plot_embeddings. Filters all available data based on the provided keys and experimental condition."""
+    if col is None:
+        col = 0
+    else:
+        exp_condition = col
+        
     # Get experimental conditions per video
     if embeddings is None and supervised_annotations is None:
         raise ValueError(
@@ -1013,7 +1020,7 @@ def _filter_embeddings(
 
     try:
         if exp_condition is None:
-            exp_condition = list(embeddings._exp_conditions.values())[0].columns[0]
+            exp_condition = list(embeddings._exp_conditions.values())[0].columns[col]
 
         concat_hue = [
             coordinates.get_exp_conditions[i][exp_condition].values[0]
@@ -1024,9 +1031,7 @@ def _filter_embeddings(
 
     except AttributeError:
         if exp_condition is None:
-            exp_condition = list(supervised_annotations._exp_conditions.values())[
-                0
-            ].columns[0]
+            exp_condition = list(supervised_annotations._exp_conditions.values())[0].columns[col]
 
         concat_hue = [
             coordinates.get_exp_conditions[i][exp_condition].values[0]
@@ -1500,8 +1505,9 @@ def plot_embeddings_timelapse(
     my_title: str = '',
     my_color_dict: dict = None,
     my_coords_dict: dict = None,
-    specific_condition: str = None,
-    given_pca: PCA = None
+    specific_condition: dict = None,
+    given_pca: PCA = None,
+    outliers: list = None,
     ):
     """Return a scatter plot of the passed projection. Allows for temporal and quality filtering, animal aggregation, and changepoint detection size visualization.
 
@@ -1530,33 +1536,40 @@ def plot_embeddings_timelapse(
     """
     dataframes_to_concatenate = []
     for bin_index in bin_index_list:
-
-        (emb_to_plot,
-            counts_to_plot,
-            breaks_to_plot,
-            sup_annots_to_plot,
-            concat_hue,
-        ) = _filter_embeddings(
-            coordinates,
-            copy.deepcopy(embeddings),
-            copy.deepcopy(soft_counts),
-            copy.deepcopy(breaks),
-            copy.deepcopy(supervised_annotations),
-            exp_condition,
-            bin_size,
-            bin_index,
-            precomputed_bins,
-        )
-        show = True
         
-        # Filter by specific_condition
-        concat_hue_mask = [True if item == specific_condition else False for item in concat_hue]
-        
+        masks = []
+        for col, sc in specific_condition.items():
+            
+            (emb_to_plot,
+                counts_to_plot,
+                breaks_to_plot,
+                sup_annots_to_plot,
+                concat_hue,
+            ) = _filter_embeddings(
+                coordinates,
+                copy.deepcopy(embeddings),
+                copy.deepcopy(soft_counts),
+                copy.deepcopy(breaks),
+                copy.deepcopy(supervised_annotations),
+                exp_condition,
+                bin_size,
+                bin_index,
+                precomputed_bins,
+                col
+            )
+            show = True
+            
+            # Filter by specific_condition
+            concat_hue_mask = [True if item == sc else False for item in concat_hue]
+            masks.append(concat_hue_mask)
+            
+        concat_hue_mask = [all(sublist) for sublist in zip(*masks)]
+             
         dataframe_for_titles = [emb_to_plot, counts_to_plot, sup_annots_to_plot]
         positions_not_none = [index for index, item in enumerate(dataframe_for_titles) if item is not None]
         dataframe_for_titles = [elem for elem in dataframe_for_titles if elem is not None][0]
         dataframe_for_titles = {key: value for key, value, boolean in zip(dataframe_for_titles.keys(), dataframe_for_titles.values(), concat_hue_mask) if boolean}
-        
+            
         tag = '_bin' + str(bin_index)
         dataframe_for_titles = {key + tag: value for key, value in dataframe_for_titles.items()}
         dataframes_to_concatenate.append(dataframe_for_titles)
@@ -1676,7 +1689,11 @@ def plot_embeddings_timelapse(
                 ax,
                 add_stats
             )
-
+    
+    # Delete outliers
+    if outliers is not None:
+        embedding_dataset = embedding_dataset.drop(outliers)
+    
     # Plot selected embeddings using the specified settings
     if ax is None:
         fig, ax = plt.subplots(figsize=(6,6))
@@ -3279,8 +3296,9 @@ def annotate_video(
 
     return True
 
-def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
 
+def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
+        
     if ax is None:
         fig, ax = plt.subplots(figsize=(3.5,4))
     
@@ -3311,9 +3329,10 @@ def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
                 markeredgecolor='black',
                 markeredgewidth=1,
                 markersize=7) 
-
+    
+    xlabels = list(stats_dict.values())[0]
     ax.set_xticks(positions)
-    ax.set_xticklabels(conditions)
+    ax.set_xticklabels(xlabels)
     
     # plt.ylim(0,100)
     ax.set_xlabel('')
@@ -3328,23 +3347,26 @@ def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
     ax.tick_params(axis='y', colors=grey_stark)
     
     for significance, pairs in stats_dict.items():
-        values_x = embedding_dataset[embedding_dataset['experimental condition'] == pairs[0]][pc]
-        values_y = embedding_dataset[embedding_dataset['experimental condition'] == pairs[1]][pc]
+        values_x = embedding_dataset[embedding_dataset['experimental condition'] == conditions[0]][pc]
+        values_y = embedding_dataset[embedding_dataset['experimental condition'] == conditions[1]][pc]
         y, h, col = max(max(values_x), max(values_y)) + 0.5, 0.15, grey_stark
-        position_1 = conditions.index(pairs[0])
-        position_2 = conditions.index(pairs[1])
+        position_1 = positions[0]
+        position_2 = positions[1]
         ax.plot([position_1, position_1, position_2, position_2], [y, y+h, y+h, y], lw=1.5, c=col)
-        ax.text((position_1+position_2)*.5, y+h*0.5, significance, ha='center', va='bottom', color=col, size=18)
+        ax.text((position_1+position_2)*.5, y+h*1.5, significance, ha='center', va='bottom', color=col, size=12)
     
     plt.tight_layout()
     return ax
 
-def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
+
+def lollipop(dataframe_for_titles, rotated_loading_scores, pca='PCA-1', ax=None):
         
     # Display the variable names and their corresponding loading scores
-    features = next(iter(dataframe_for_titles.values())).columns.tolist()
-    # pc_loading_scores = rotated_loading_scores[0, :] # PC1
-    pc_loading_scores = rotated_loading_scores[1, :] # PC2
+    features = next(iter(dataframe_for_titles.values())).columns.tolist()[:-1]
+    if pca == 'PCA-1':
+        pc_loading_scores = rotated_loading_scores[0, :] # PC1
+    if pca == 'PCA-2':
+        pc_loading_scores = rotated_loading_scores[1, :] # PC2
     loading_scores_df = pd.DataFrame({'Variable': features, 'PC_Loading': pc_loading_scores})
     loading_scores_df = loading_scores_df.reindex(loading_scores_df['PC_Loading'].abs().sort_values(ascending=False).index)
     loading_scores_df.drop(loading_scores_df[loading_scores_df['PC_Loading'] == 0].index, inplace=True)
@@ -3357,7 +3379,7 @@ def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
     my_range_array = np.array(my_range)
         
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6,7))
+        fig, ax = plt.subplots(figsize=(6,3))
     
     sns.set_theme(style="whitegrid")
     ax.yaxis.grid(False)
@@ -3377,8 +3399,8 @@ def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
     ax.set_xticks([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     
     signs = {
-        'Positive': blue,
-        'Negative': red
+        'Positive': '#00BFC4',
+        'Negative': '#F9766E'
         }
     for sign, color in signs.items():
         mask = (ordered_df['sign'] == sign)
@@ -3402,8 +3424,9 @@ def lollipop(dataframe_for_titles, rotated_loading_scores, pca, ax=None):
     plt.tight_layout()
     return ax
     
-def timelapse(dataframe_for_titles, concat_hue, column, ax=None):
-    
+
+def timelapse(dataframe_for_titles, concat_hue, column, min_y, max_y, my_color, ax=None):
+                
     hues = sorted(list(set(concat_hue)))
     dict_to_plot = {}
     for hue in hues:
@@ -3415,22 +3438,21 @@ def timelapse(dataframe_for_titles, concat_hue, column, ax=None):
         dict_to_plot[hue] = mean_list
     df_to_plot = pd.DataFrame(dict_to_plot)
     melted_df = pd.melt(df_to_plot, id_vars=None, var_name='bins', value_name='values')
-    
-    # Convert number of frames into duration
-    
-    
+        
     if ax is None:
         fig, ax = plt.subplots(figsize=(3,3))
-        
+    
     sns.set_theme(style="whitegrid")
     ax.yaxis.grid(False)
     ax.xaxis.grid(False)
     
+    ax.set_ylim(min_y, max_y)
+    
     split_values = column.split('_')
     split_values[0] = split_values[0].capitalize()
     new_string = ' '.join(split_values)
-    ax.set_ylabel(new_string)
-    ax.set_xlabel('Time bins', loc='left')
+    ax.set_ylabel(' ')
+    ax.set_xlabel(new_string)
     
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
@@ -3441,8 +3463,28 @@ def timelapse(dataframe_for_titles, concat_hue, column, ax=None):
     ax.tick_params(axis='x', colors=grey_stark)
     ax.tick_params(axis='y', colors=grey_stark)
     
-    sns.lineplot(x=melted_df['bins'], y=melted_df['values'], label='', legend=None, color=grey_stark, ax=ax)
+    ax.set_xticklabels('')
     
+    sns.lineplot(x=melted_df['bins'], y=melted_df['values'], label='', legend=None, color=my_color, ax=ax)
+    
+    x = melted_df['values'][melted_df['bins'] == hues[0]]
+    y = melted_df['values'][melted_df['bins'] == hues[1]]
+    pval = pg.ttest(x, y, paired=True).round(3)['p-val'][0]
+    if pval <= 0.0001:
+        significance = '***'
+        my_size = 18
+    elif pval <= 0.001 and pval > 0.001:
+        significance = '**'
+        my_size = 18
+    elif pval <= 0.05 and pval > 0.001:
+        significance = '*'
+        my_size = 18
+    elif pval > 0.05:
+        significance = 'ns (p=' + str(pval) + ')'
+        my_size = 11
+    
+    ax.text(0.5, max_y, significance, ha='center', va='bottom', color=grey_stark, size=my_size)
+
     # Change tags in the X axis
     # xtick_labels = [str(x) for x in melted_df['bins']]
     # ax.set_xticks(melted_df['bins'])
@@ -3459,7 +3501,7 @@ def plot_silhouette_scores(new_silhouette_score_dict):
     plt.plot(result_list, scores, "bo-")
     plt.xlabel("$k$")
     plt.ylabel("Silhouette score")
-    plt.axis([1.8, 25.5, -1, 1])
+    plt.axis([1.8, 15.5, -1, 1])
     plt.grid()
     plt.hlines(0, 1.8, 25.5)
     plt.show()

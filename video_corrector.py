@@ -10,7 +10,7 @@ from pims import Video
 import cv2
 import shutil
 
-directory = "/run/user/1000/gvfs/smb-share:server=172.20.4.47,share=becell/Lab Projects/ERCstG_HighMemory/Data/Marc/1) SOC/2024-01a02 cFos/corrected/"
+directory = "//folder/becell/Lab Projects/ERCstG_HighMemory/Data/Marc/1) SOC/2024-03 - unpaired controls/corrected/"
 
 def get_events(dat_path):
     with open(dat_path, 'r') as fp:

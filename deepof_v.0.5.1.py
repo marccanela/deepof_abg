@@ -15,17 +15,19 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Define directories
-directory_output = '/home/sie/Desktop/marc/brain_01a02/'
-directory_dlc = '/home/sie/Desktop/marc/brain_01a02/csv_corrected/'
-directory_videos = '/home/sie/Desktop/marc/brain_01a02/avi_corrected/'
+directory_output = 'C:/Users/mcanela/Desktop/project/'
+directory_dlc = directory_output + 'csv/'
+directory_videos = directory_output + 'avi/'
 
 # Convert CSV-multi-animal into CSV-single-animal
 for file in os.listdir(directory_dlc):
     if file.endswith('.csv'):
         file_path = os.path.join(directory_dlc, file)
         df = pd.read_csv(file_path, header=None)
-        df_modified = df.drop(1)
-        df_modified.to_csv(file_path[:-7] + '.csv', index=False, header=False)
+        df = df.drop(1)
+        df.fillna(0.00001, inplace=True)
+        df.to_csv(file_path[:-7] + '.csv', index=False, header=False)
+
 
 # Prepare the project
 my_deepof_project_raw = deepof.data.Project(
@@ -69,9 +71,6 @@ my_deepof_project = deepof.data.load_project(directory_output + "deepof_tutorial
 supervised_annotation = my_deepof_project.supervised_annotation()
 with open(directory_output + 'supervised_annotation.pkl', 'wb') as file:
     pickle.dump(supervised_annotation, file)
-
-
-
 
 
 

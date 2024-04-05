@@ -268,7 +268,10 @@ def get_time_on_cluster(
 
 
 def get_aggregated_embedding(
-    embedding: np.ndarray, given_pca: PCA = None, reduce_dim: bool = False, agg: str = "mean"
+    embedding: np.ndarray, 
+    given_pca: PCA = None, 
+    reduce_dim: bool = False, 
+    agg: str = "mean"
 ):
     """Aggregate the embeddings of a set of videos, using the specified aggregation method.
 
@@ -292,6 +295,9 @@ def get_aggregated_embedding(
         embedding = pd.DataFrame(
             {key: np.nanmedian(value, axis=0) for key, value in embedding.items()}
         ).T
+        
+    # embedding = embedding.iloc[:, :4] # Delete "missing" column and 'speed' column
+    embedding = embedding.iloc[:, :5] # Delete "missing" column
     
     if reduce_dim:
         

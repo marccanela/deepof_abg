@@ -18,9 +18,9 @@ import matplotlib.cm as cm
 from sklearn.metrics import silhouette_samples, silhouette_score
 
 # Define directories
-directory_output = '/home/sie/Desktop/marc/brain_01a02/'
-directory_dlc = '/home/sie/Desktop/marc/dual videos/h5'
-directory_videos = '/home/sie/Desktop/marc/dual videos/mp4'
+directory_output = '/home/sie/Desktop/marc/project/'
+directory_dlc = directory_output + 'csv/'
+directory_videos = directory_output + 'avi/'
 
 # Prepare the project
 my_deepof_project_raw = deepof.data.Project(
@@ -29,9 +29,9 @@ my_deepof_project_raw = deepof.data.Project(
                 table_path=os.path.join(directory_dlc),
                 project_name="deepof_tutorial_project",
                 arena="polygonal-manual",
-                animal_ids=['colortail','nocolor'],
-                table_format=".h5",
-                video_format=".mp4",
+                # animal_ids=['colortail','nocolor'],
+                table_format=".csv",
+                video_format=".avi",
                 bodypart_graph='deepof_14',
                 # exclude_bodyparts=["Tail_1", "Tail_2", "Tail_tip"],
                 video_scale=200,
@@ -44,7 +44,8 @@ my_deepof_project = my_deepof_project_raw.create(force=True)
 
 # Edit wrong arenas
 my_deepof_project.edit_arenas(
-    videos=['20240119_Marc_ERC SOC light_Males_box de_06_01_1'],
+    videos=['20230728_Marc_ERC SOC S1_Males_box ef_04_01_1',
+            '20230810_Marc_ERC SOC S2_Males_box ab_06_01_1'],
     arena_type="polygonal-manual",
 )
 
@@ -54,12 +55,12 @@ my_deepof_project.load_exp_conditions(directory_output + 'conditions.csv')
 # Check conditions
 coords = my_deepof_project.get_coords()
 print("The original dataset has {} videos".format(len(coords)))
-coords = coords.filter_condition({"protocol": "paired"})
-print("The filtered dataset has only {} videos".format(len(coords)))
+new_coords = coords.filter_condition({"group": "no-shock"})
+print("The filtered dataset has only {} videos".format(len(new_coords)))
 
 # Perform a supervised analysis
 supervised_annotation = my_deepof_project.supervised_annotation()
-with open('/home/sie/Desktop/marc/dual videos/supervised_annotation.pkl', 'wb') as file:
+with open(directory_output + 'supervised_annotation.pkl', 'wb') as file:
     pickle.dump(supervised_annotation, file)
     
 # Perform an unsupervised analysis
@@ -77,23 +78,24 @@ graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler = my_deepof_
 def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler):
     # start_time = time.time()
     silhouette_score_dict = {}
-    num_clusters = list(range(2, 16))
-    # num_clusters = [8]
+    # num_clusters = list(range(2, 10))
+    num_clusters = [8]
     
     for num in num_clusters:
         trained_model = my_deepof_project.deep_unsupervised_embedding(
             preprocessed_object=graph_preprocessed_coords, # Change to preprocessed_coords to use non-graph embeddings
             adjacency_matrix=adj_matrix,
             embedding_model="VaDE", # Can also be set to 'VQVAE' and 'Contrastive'
-            epochs=10, # (Default 10)
+            epochs=150, # (Default 150)
             encoder_type="recurrent", # Can also be set to 'TCN' and 'transformer'
             n_components=num, # (Default 10)
             latent_dim=4, # Dimention size of the latent space (aka, number of embeddings) (Default 4)
-            batch_size=1024, # (Default 1024)
+            batch_size=64, # (Default 64)
             verbose=True, # Set to True to follow the training loop
             interaction_regularization=0.0, # Change to 0.25 when multianimal
             pretrained=False, # Set to False to train a new model!
-        )
+            output_path=directory_output
+            )
         embeddings, soft_counts, breaks = deepof.model_utils.embedding_per_video(
             coordinates=my_deepof_project,
             to_preprocess=to_preprocess,
@@ -108,9 +110,9 @@ def silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, 
 
 silhouette_score_dict = silhouette_score_unsupervised(my_deepof_project, graph_preprocessed_coords, adj_matrix, to_preprocess, global_scaler)
 
-with open('/home/sie/Desktop/marc/brain_01a02/silhouette_score_dict.pkl', 'wb') as file:
+with open(directory_output + 'silhouette_score_dict_8clusters.pkl', 'wb') as file:
     pickle.dump(silhouette_score_dict, file)
-with open('/home/sie/Desktop/marc/brain_01a02/silhouette_score_dict.pkl', 'rb') as file:
+with open(directory_output + 'silhouette_score_dict.pkl', 'rb') as file:
     silhouette_score_dict = pickle.load(file)
 
 def create_silhouette_score_dict(silhouette_score_dict):

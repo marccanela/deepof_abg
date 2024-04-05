@@ -22,7 +22,7 @@ blue = '#194680'
 red = '#801946'
 grey = '#636466'
 
-# directory_output = '//folder/becell/Lab Projects/ERCstG_HighMemory/Data/Marc/1) SOC/2023-07a08 SOC Controls_males/DeepOF analysis/'
+# directory_output = '/home/sie/Desktop/'
 # with open(directory_output + 'supervised_annotation.pkl', 'rb') as file:
 #     supervised_annotation = pickle.load(file)
 
@@ -72,7 +72,6 @@ def data_to_plot_mask(directory_output, conditions_cols, specific_conditions):
     experiment_ids = conditions[global_mask]['experiment_id'].to_list()  
     
     return experiment_ids
-
 
 
 def data_set_to_plot(supervised_annotation, directory_output, conditions_cols, specific_conditions, behavior, length=360, bin_size=10, filter_out=''):
@@ -189,7 +188,7 @@ def count_function(my_list):
 # Plot functions
 # =============================================================================
 
-def timeseries(supervised_annotation, directory_output, column='huddle', color_contrast=blue, ax=None):
+def timeseries(supervised_annotation, directory_output, column='huddle', color_contrast=red, ax=None):
     '''
     Parameters
     ----------
@@ -207,15 +206,15 @@ def timeseries(supervised_annotation, directory_output, column='huddle', color_c
     
     label_offset = 0.2  # Offset for label positioning
     
-    data1 = data_set_to_plot(supervised_annotation, directory_output, ['learning', 'group', 'batch'], ['mediated', 'no-shock', 'c'], column)
+    data1 = data_set_to_plot(supervised_annotation, directory_output, ['protocol', 'group'], ['light', '3order'], column)
     data1['bin']= data1['bin'] / 6
     sns.lineplot(x=data1['bin'], y=data1[column], label='', legend=None, color=red)
-    ax.text(data1['bin'].iloc[-1] + label_offset, data1[data1.bin == data1.bin.iloc[-1]][column].mean(), 'c noshock', fontsize=12, color=red, weight='bold')
+    ax.text(data1['bin'].iloc[-1] + label_offset, data1[data1.bin == data1.bin.iloc[-1]][column].mean(), 'light', fontsize=12, color=red, weight='bold')
 
-    data2 = data_set_to_plot(supervised_annotation, directory_output, ['learning', 'group', 'batch'], ['mediated', 'no-shock', 'b'], column)
+    data2 = data_set_to_plot(supervised_annotation, directory_output, ['protocol', 'group'], ['tone', '3order'], column)
     data2['bin']= data2['bin'] / 6
     sns.lineplot(x=data2['bin'], y=data2[column], label='', legend=None, color=blue)    
-    ax.text(data2['bin'].iloc[-1] + label_offset, data2[data2.bin == data2.bin.iloc[-1]][column].mean(), 'b noshock', fontsize=12, color=blue, weight='bold')
+    ax.text(data2['bin'].iloc[-1] + label_offset, data2[data2.bin == data2.bin.iloc[-1]][column].mean(), 'tone', fontsize=12, color=blue, weight='bold')
     
     upper_limit = 100
     plt.ylim(0,upper_limit)
@@ -261,14 +260,14 @@ def boxplot(supervised_annotation, directory_output, column, learning, group, co
     ax.xaxis.grid(False)
     
     data1_position = 0
-    data1 = data_set_to_plot(supervised_annotation, directory_output, ['learning','group','batch'], [learning,group,'b'], column, bin_size=60)
+    data1 = data_set_to_plot(supervised_annotation, directory_output, ['learning','group'], [learning, group], column, bin_size=60)
     data1 = data1[data1.bin == 3] # The bin starts with 1 (i.e., 1, 2, 3, 4, etc.)
     data1 = data1[column].tolist()
     data1_mean = np.mean(data1)
     data1_error = np.std(data1, ddof=1)
 
     data2_position = 1
-    data2 = data_set_to_plot(supervised_annotation, directory_output, ['learning','group','batch'], [learning,group,'b'], column, bin_size=60)
+    data2 = data_set_to_plot(supervised_annotation, directory_output, ['learning','group'], [learning, group], column, bin_size=60)
     data2 = data2[data2.bin == 4] # The bin starts with 1 (i.e., 1, 2, 3, 4, etc.)
     data2 = data2[column].tolist()
     data2_mean = np.mean(data2)
@@ -323,28 +322,29 @@ def boxplot(supervised_annotation, directory_output, column, learning, group, co
     ax.tick_params(axis='x', colors=grey)
     ax.tick_params(axis='y', colors=grey)
     
-    # pvalue = pg.ttest(off_list, on_list, paired=True)['p-val'][0]
+    stats_df = compare_timepoints(supervised_annotation, directory_output, value_col=column)
+    pvalue = float(stats_df[stats_df.Factor1 == learning][stats_df.Factor2 == group]['P-value'])
     
-    # def convert_pvalue_to_asterisks(pvalue):
-    #     ns = "ns (p=" + str(pvalue)[1:4] + ")"
-    #     if pvalue <= 0.0001:
-    #         return "****"
-    #     elif pvalue <= 0.001:
-    #         return "***"
-    #     elif pvalue <= 0.01:
-    #         return "**"
-    #     elif pvalue <= 0.05:
-    #         return "*"
-    #     return ns
+    def convert_pvalue_to_asterisks(pvalue):
+        ns = "ns (p=" + str(pvalue)[1:4] + ")"
+        if pvalue <= 0.0001:
+            return "****"
+        elif pvalue <= 0.001:
+            return "***"
+        elif pvalue <= 0.01:
+            return "**"
+        elif pvalue <= 0.05:
+            return "*"
+        return ns
 
-    # y, h, col = max(max(off_list), max(on_list)) + 5, 2, 'k'
+    y, h, col = max(max(data1), max(data2)) + 5, 2, grey
     
-    # ax.plot([off_position, off_position, on_position, on_position], [y, y+h, y+h, y], lw=1.5, c=col)
+    ax.plot([data1_position, data1_position, data2_position, data2_position], [y, y+h, y+h, y], lw=1.5, c=col)
     
-    # if pvalue > 0.05:
-    #     ax.text((off_position+on_position)*.5, y+2*h, convert_pvalue_to_asterisks(pvalue), ha='center', va='bottom', color=col, size=11)
-    # elif pvalue <= 0.05:    
-    #     ax.text((off_position+on_position)*.5, y, convert_pvalue_to_asterisks(pvalue), ha='center', va='bottom', color=col, size=18)
+    if pvalue > 0.05:
+        ax.text((data1_position+data2_position)*.5, y+2*h, convert_pvalue_to_asterisks(pvalue), ha='center', va='bottom', color=col, size=11)
+    elif pvalue <= 0.05:    
+        ax.text((data1_position+data2_position)*.5, y, convert_pvalue_to_asterisks(pvalue), ha='center', va='bottom', color=col, size=18)
     
     plt.tight_layout()
     return ax
@@ -504,7 +504,7 @@ def discrimination_index_summary(supervised_annotation, directory_output, column
 
 def iterate_plot_function(supervised_annotation, directory_output, column='huddle'):
     
-    directory = '//folder/becell/Lab Projects/ERCstG_HighMemory/Data/Marc/1) SOC/2023-07a08 SOC Controls_males/DeepOF analysis/plots_batch_a_b_c'
+    directory = '/home/sie/Desktop/marc/project/deepof_tutorial_project/Figures/'
     learnings = ['direct', 'mediated']
     groups = ['paired', 'unpaired', 'no-shock']
     
@@ -540,8 +540,8 @@ def iterate_plot_function(supervised_annotation, directory_output, column='huddl
 
 def generate_statistics_df(supervised_annotation, directory_output, column):
     
-    learnings = ['Direct', 'Mediated']
-    groups = ['Paired', 'Unpaired', 'No-shock']
+    learnings = ['direct', 'mediated']
+    groups = ['paired', 'unpaired', 'no-shock']
     datas = []
 
     for learning in learnings:
@@ -564,7 +564,7 @@ def generate_statistics_df(supervised_annotation, directory_output, column):
 # df = generate_statistics_df(supervised_annotation, directory_output, column='speed')
 # pg.normality(df, dv='speed', group='group', method="shapiro")
 
-def compare_timepoints(supervised_annotation, directory_output, factor1_col='learning', factor2_col='group', timepoint_col='timepoint', value_col='speed'):
+def compare_timepoints(supervised_annotation, directory_output, factor1_col='learning', factor2_col='group', timepoint_col='timepoint', value_col='huddle'):
     
     df = generate_statistics_df(supervised_annotation, directory_output, value_col)
     
@@ -607,7 +607,6 @@ def compare_timepoints(supervised_annotation, directory_output, factor1_col='lea
     results_df = pd.DataFrame(results_dict)
 
     return results_df
-    
     
     
     
