@@ -18,7 +18,7 @@ import matplotlib.cm as cm
 from sklearn.metrics import silhouette_samples, silhouette_score
 
 # Define directories
-directory_output = '/home/sie/Desktop/marc/project/'
+directory_output = '//folder/becell/Lab Projects/ERCstG_HighMemory/Data/Marc/1) SOC/2023-07a08 SOC Controls_males/DeepOF analysis/'
 directory_dlc = directory_output + 'csv/'
 directory_videos = directory_output + 'avi/'
 

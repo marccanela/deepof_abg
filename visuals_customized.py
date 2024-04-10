@@ -3297,7 +3297,7 @@ def annotate_video(
     return True
 
 
-def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
+def boxplot(embedding_dataset, color_dict, pc, stats_dict, groups, ax=None):
         
     if ax is None:
         fig, ax = plt.subplots(figsize=(3.5,4))
@@ -3309,12 +3309,12 @@ def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
     ax.spines['top'].set_visible(False)
     jitter = 0.15 # Dots dispersion
     
-    conditions = embedding_dataset['experimental condition'].unique().tolist()
+    conditions = embedding_dataset[groups].unique().tolist()
     positions = []
     for condition in conditions:
         position = conditions.index(condition)
         positions.append(position)
-        values_to_plot = embedding_dataset[embedding_dataset['experimental condition'] == condition][pc]
+        values_to_plot = embedding_dataset[embedding_dataset[groups] == condition][pc]
         mean = np.mean(values_to_plot)
         error = np.std(values_to_plot, ddof=1)
 
@@ -3347,8 +3347,8 @@ def boxplot(embedding_dataset, color_dict, pc, stats_dict, ax=None):
     ax.tick_params(axis='y', colors=grey_stark)
     
     for significance, pairs in stats_dict.items():
-        values_x = embedding_dataset[embedding_dataset['experimental condition'] == conditions[0]][pc]
-        values_y = embedding_dataset[embedding_dataset['experimental condition'] == conditions[1]][pc]
+        values_x = embedding_dataset[embedding_dataset[groups] == conditions[0]][pc]
+        values_y = embedding_dataset[embedding_dataset[groups] == conditions[1]][pc]
         y, h, col = max(max(values_x), max(values_y)) + 0.5, 0.15, grey_stark
         position_1 = positions[0]
         position_2 = positions[1]
